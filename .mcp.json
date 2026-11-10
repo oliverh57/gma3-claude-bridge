@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "grandma3": {
+      "command": "/opt/homebrew/bin/python3",
+      "args": [
+        "/Users/oliverhynds/MALightingTechnology/gma3_library/datapools/plugins/claude_mailbox/ma3_mcp.py"
+      ]
+    },
+    "grandma3-25": {
+      "command": "/opt/homebrew/bin/python3",
+      "args": [
+        "/Users/oliverhynds/MALightingTechnology/gma3_library/datapools/plugins/claude_mailbox/ma3_mcp.py"
+      ],
+      "env": {
+        "MA3_MAILBOX": "v25"
+      }
+    }
+  }
+}

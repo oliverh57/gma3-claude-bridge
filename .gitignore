@@ -1,0 +1,23 @@
+# Code only: everything is ignored except the files listed below.
+# Show data, backups, journals, logs and mailbox traffic stay local.
+/*
+!/.gitignore
+!/.mcp.json
+!/.claude/
+/.claude/*
+!/.claude/launch.json
+!/ClaudeMailbox.lua
+!/ClaudeMailbox.xml
+!/ClaudeMailbox25.lua
+!/ClaudeMailbox25.xml
+!/ReaperBridge.xml
+!/claude_mailbox/
+/claude_mailbox/*
+!/claude_mailbox/ma3.py
+!/claude_mailbox/ma3_mcp.py
+!/claude_mailbox/dashboard/
+/claude_mailbox/dashboard/*
+!/claude_mailbox/dashboard/index.html
+!/claude_mailbox/dashboard/server.py
+.DS_Store
+__pycache__/

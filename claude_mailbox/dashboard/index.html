@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Bridge</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #121211;
+  --surface-1: #1a1a19;
+  --surface-2: #232321;
+  --surface-3: #30302d;
+  --line: #2e2e2b;
+  --text-primary: #f0efec;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e85;
+  --series-change: #d95926;
+  --series-read: #3987e5;
+  --good: #0ca30c;
+  --warning: #fab219;
+  --critical: #d03b3b;
+  --critical-text: #f08a8a;
+  --warning-text: #fab219;
+  --good-text: #4cc94c;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f3f3f0;
+    --surface-1: #fcfcfb;
+    --surface-2: #f0f0ec;
+    --surface-3: #e2e2dc;
+    --line: #e0e0da;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #6d6c67;
+    --series-change: #eb6834;
+    --series-read: #2a78d6;
+    --critical-text: #b02a2a;
+    --warning-text: #8a5d00;
+    --good-text: #006300;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text-primary);
+  font: 14px/1.45 var(--sans); font-variant-numeric: tabular-nums;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--series-read); outline-offset: 2px; }
+
+.page { max-width: 1320px; margin: 0 auto; padding: 20px 24px 64px; }
+.top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.top h1 { font-size: 16px; font-weight: 650; margin: 0; letter-spacing: .01em; }
+.top .updated { color: var(--text-muted); font-size: 12px; }
+.top .spacer { flex: 1; }
+
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 8px; padding: 2px; }
+.seg button {
+  border: 0; background: none; color: var(--text-secondary); padding: 4px 11px;
+  border-radius: 6px; font-size: 13px; white-space: nowrap;
+}
+.seg button[aria-pressed="true"] { background: var(--surface-3); color: var(--text-primary); }
+.seg .n { color: var(--text-muted); margin-left: 4px; font-size: 12px; }
+
+.banner {
+  background: var(--surface-1); border-left: 3px solid var(--critical); padding: 10px 14px;
+  border-radius: 6px; margin-bottom: 16px; color: var(--text-primary);
+}
+.banner[hidden] { display: none; }
+
+section { margin-top: 30px; }
+section > h2 { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 0 0 10px; }
+.note { color: var(--text-muted); font-size: 12px; margin: 8px 0 0; }
+
+.panel { background: var(--surface-1); border: 1px solid var(--line); border-radius: 10px; }
+
+/* Bridges */
+.bridges { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; }
+.bridges.swap { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+.bridge { padding: 16px 18px; min-width: 0; }
+.bridge.off .show { color: var(--text-secondary); }
+.bridge header { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.bridge .name { font-size: 13px; color: var(--text-secondary); }
+.show {
+  font-size: 26px; line-height: 1.2; font-weight: 650; margin: 10px 0 2px;
+  overflow-wrap: anywhere; letter-spacing: -.01em;
+}
+.bridge.off .show { font-size: 19px; }
+.subline { color: var(--text-secondary); font-size: 13px; min-height: 19px; }
+.flag { display: inline-flex; gap: 6px; align-items: baseline; margin-top: 8px; font-size: 13px; }
+.flag.warn { color: var(--warning-text); }
+.flag.ok { color: var(--good-text); }
+.flag.bad { color: var(--critical-text); }
+.facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px 18px; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line);
+}
+.facts dt { color: var(--text-muted); font-size: 12px; }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.selftest { margin-top: 12px; font-size: 12px; color: var(--text-muted); }
+.selftest summary { cursor: pointer; }
+.selftest ul { margin: 8px 0 0; padding: 0; list-style: none; font-family: var(--mono); color: var(--text-secondary); }
+.selftest li { overflow-wrap: anywhere; padding: 1px 0; }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; color: var(--text-secondary); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex: none; }
+.pill.live .dot { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent); }
+.pill.lost .dot { background: var(--warning); }
+.pill.stopped .dot, .pill.never .dot { background: var(--text-muted); }
+
+/* Tiles and chart */
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; }
+.tile { padding: 14px 18px; border-right: 1px solid var(--line); }
+.tile:last-child { border-right: 0; }
+.tile .label { color: var(--text-muted); font-size: 12px; }
+.tile .value { font-size: 26px; font-weight: 600; line-height: 1.25; }
+.tile .sub { color: var(--text-muted); font-size: 12px; }
+.chart-wrap { border-top: 1px solid var(--line); padding: 12px 18px 12px; position: relative; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+#chart { display: block; width: 100%; height: 170px; }
+#chart text { fill: var(--text-muted); font-size: 11px; }
+#chart .grid { stroke: var(--line); stroke-width: 1; }
+#chart .hit { fill: transparent; }
+#chart .hit:hover { fill: color-mix(in srgb, var(--text-primary) 7%, transparent); }
+.tip {
+  position: absolute; pointer-events: none; background: var(--surface-3); color: var(--text-primary);
+  padding: 7px 10px; border-radius: 6px; font-size: 12px; white-space: nowrap; z-index: 5;
+  box-shadow: 0 4px 14px rgb(0 0 0 / .35);
+}
+.tip[hidden] { display: none; }
+.tip b { font-weight: 600; display: block; margin-bottom: 2px; }
+
+/* Commands */
+.filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+.filters input {
+  flex: 1 1 220px; min-width: 0; background: var(--surface-1); border: 1px solid var(--line);
+  padding: 6px 10px; border-radius: 8px;
+}
+.filters input::placeholder { color: var(--text-muted); }
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left; font-weight: 500; font-size: 12px; color: var(--text-muted);
+  padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+td { padding: 7px 12px; border-bottom: 1px solid var(--line); vertical-align: baseline; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr.row { cursor: pointer; }
+tbody tr.row:hover td { background: var(--surface-2); }
+tbody tr.row:focus-visible { outline-offset: -2px; }
+tr.fresh td { animation: fresh 2.4s ease-out; }
+@keyframes fresh { from { background: color-mix(in srgb, var(--series-read) 22%, transparent); } }
+@media (prefers-reduced-motion: reduce) { tr.fresh td { animation: none; } }
+.t-time { white-space: nowrap; color: var(--text-secondary); }
+.t-ran, .t-result { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.t-result { color: var(--text-secondary); }
+.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.t-num { text-align: right; white-space: nowrap; color: var(--text-secondary); }
+th.t-num { text-align: right; }
+.t-bridge { white-space: nowrap; color: var(--text-secondary); font-size: 13px; }
+tr.group td { background: var(--surface-2); font-size: 12px; font-weight: 600; padding: 5px 12px; overflow-wrap: anywhere; }
+tr.group .on { color: var(--text-muted); font-weight: 400; }
+tr.group .unknown { color: var(--text-muted); font-weight: 400; }
+.kind { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 13px; color: var(--text-secondary); }
+.kind i { width: 8px; height: 8px; border-radius: 2px; }
+.kind.change { color: var(--text-primary); }
+.kind.change i { background: var(--series-change); }
+.kind.read i { background: var(--series-read); }
+.st { white-space: nowrap; font-size: 13px; color: var(--text-muted); }
+.st.bad { color: var(--critical-text); }
+.st.run { color: var(--warning-text); }
+.more { display: block; width: 100%; background: none; border: 0; border-top: 1px solid var(--line); color: var(--text-secondary); padding: 9px; border-radius: 0 0 10px 10px; }
+.more:hover { background: var(--surface-2); }
+.empty { padding: 24px 18px; color: var(--text-muted); text-align: center; }
+
+/* Show data */
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.barlist { padding: 14px 18px; min-width: 0; }
+.barlist h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.bar-row {
+  display: grid; grid-template-columns: minmax(90px, 130px) minmax(0, 1fr) 52px;
+  gap: 10px; align-items: center; padding: 3px 0; font-size: 13px;
+}
+.bar-row .nm { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-row .track { height: 10px; }
+.bar-row .fill { height: 100%; min-width: 2px; background: var(--series-read); border-radius: 0 4px 4px 0; }
+.bar-row .val { text-align: right; }
+
+/* Drawer */
+dialog {
+  position: fixed; inset: 0 0 0 auto; margin: 0; height: 100dvh; max-height: 100dvh;
+  width: min(760px, 100vw); max-width: 100vw; border: 0; border-left: 1px solid var(--line);
+  background: var(--surface-1); color: var(--text-primary); padding: 0;
+}
+dialog::backdrop { background: rgb(0 0 0 / .45); }
+.d-head { position: sticky; top: 0; background: var(--surface-1); padding: 16px 20px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: flex-start; z-index: 1; }
+.d-head h2 { margin: 0; font-size: 15px; font-weight: 600; font-family: var(--mono); overflow-wrap: anywhere; flex: 1; min-width: 0; }
+.d-close { background: var(--surface-2); border: 0; border-radius: 6px; padding: 3px 10px; color: var(--text-secondary); }
+.d-body { padding: 14px 20px 32px; }
+.d-body h3 { font-size: 12px; font-weight: 500; color: var(--text-muted); margin: 18px 0 6px; }
+.d-body .facts { border-top: 0; padding-top: 0; margin-top: 0; }
+pre {
+  margin: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 12px; font: 12.5px/1.5 var(--mono); overflow: auto; max-height: 52vh;
+  white-space: pre; tab-size: 2;
+}
+pre.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+.d-warn { border-left: 3px solid var(--critical); padding: 8px 12px; background: var(--surface-2); border-radius: 4px; margin-top: 14px; }
+.tmpl { font-family: var(--mono); font-size: 12.5px; padding: 3px 0; overflow-wrap: anywhere; }
+
+@media (max-width: 860px) {
+  .page { padding: 16px 16px 48px; }
+  .bridges, .bridges.swap, .two { grid-template-columns: minmax(0, 1fr); }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tile:nth-child(2) { border-right: 0; }
+  .tile:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  .show { font-size: 22px; }
+  .t-bridge, .t-result, .t-ms, .f-size { display: none; }
+  td, th { padding-left: 8px; padding-right: 8px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top">
+    <h1>Claude Bridge</h1>
+    <span class="updated" id="updated">Connecting…</span>
+    <span class="spacer"></span>
+    <div class="seg" id="bridgeFilter" role="group" aria-label="Show commands from"></div>
+  </div>
+  <div class="banner" id="banner" hidden></div>
+
+  <div class="bridges" id="bridges"></div>
+
+  <section aria-labelledby="h-activity">
+    <h2 id="h-activity">Activity</h2>
+    <div class="panel">
+      <div class="tiles" id="tiles"></div>
+      <div class="chart-wrap" id="chartWrap">
+        <div class="legend">
+          <span><i style="background:var(--series-change)"></i>Changes</span>
+          <span><i style="background:var(--series-read)"></i>Reads</span>
+          <span><i style="background:var(--critical)"></i>Failed</span>
+        </div>
+        <svg id="chart" role="img" aria-label="Commands over time. The same data is in the commands table below."></svg>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-commands">
+    <h2 id="h-commands">Commands fired</h2>
+    <div class="filters">
+      <div class="seg" id="kindFilter" role="group" aria-label="Filter by type"></div>
+      <input id="search" type="search" placeholder="Search snippets, results and show names" aria-label="Search commands">
+    </div>
+    <div class="panel" id="commandPanel"></div>
+    <p class="note">Change or Read comes from reading the snippet's source, so treat it as a guide. A loop is one row, however many times its command ran; the result column often has the real count. Show names are only known from when this dashboard started watching. Save status only counts what went through the bridge, not edits made on the console.</p>
+  </section>
+
+  <section aria-labelledby="h-data">
+    <h2 id="h-data">Show data</h2>
+    <div class="two" id="poolData"></div>
+  </section>
+
+  <section aria-labelledby="h-files">
+    <h2 id="h-files">Work on disk</h2>
+    <div class="panel" id="files"></div>
+  </section>
+</div>
+
+<dialog id="drawer" aria-labelledby="dTitle">
+  <div class="d-head">
+    <h2 id="dTitle"></h2>
+    <button class="d-close" id="dClose">Close</button>
+  </div>
+  <div class="d-body" id="dBody"></div>
+</dialog>
+
+<script>
+const PAGE = 100;
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = n => Number(n).toLocaleString('en-GB');
+const failed = c => c.status !== 'ok' && c.status !== 'pending';
+
+const view = { bridge: 'all', kind: 'all', q: '', shown: PAGE };
+let state = null, commands = [], rev = null, seen = new Set(), firstLoad = true;
+const openTests = new Set();
+const cardHtml = {};
+
+function clock(ts) {
+  const d = new Date(ts * 1000), now = new Date();
+  const t = d.toLocaleTimeString('en-GB');
+  return d.toDateString() === now.toDateString() ? t
+    : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' ' + t.slice(0, 5);
+}
+function ago(seconds) {
+  if (seconds < 90) return `${Math.max(0, Math.round(seconds))}s ago`;
+  if (seconds < 5400) return `${Math.round(seconds / 60)} min ago`;
+  if (seconds < 172800) return `${Math.round(seconds / 3600)} h ago`;
+  return `${Math.round(seconds / 86400)} days ago`;
+}
+function bytes(n) {
+  if (n == null) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1048576) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1048576).toFixed(1)} MB`;
+}
+const shortLabel = key => state?.bridges.find(b => b.key === key)?.label.replace('onPC ', '') ?? key;
+
+async function getJson(url) {
+  const reply = await fetch(url);
+  if (!reply.ok) throw new Error(`${url}: ${reply.status}`);
+  return reply.json();
+}
+
+/* ---- bridge cards */
+
+const STATE_TEXT = {
+  live: 'Live', lost: 'Heartbeat lost', stopped: 'Stopped', never: 'Never started',
+};
+
+function bridgeCard(b) {
+  const snap = b.snapshot, live = b.state === 'live';
+  const last = commands.find(c => c.bridge === b.key);
+  let title, sub = '', flag = '';
+
+  if (snap?.show) {
+    title = esc(snap.show);
+    if (b.show_file) {
+      const f = b.show_file;
+      sub = `${f.seen ? `Saved ${clock(f.seen)}` : `File stamped ${clock(f.saved)}`} · ${bytes(f.size)}`;
+    }
+    else if (live) sub = 'Not saved under this name yet';
+    if (!live) sub = `Last seen ${clock(b.snapshot_at)}`;
+  } else if (live) {
+    title = 'Waiting for the console…';
+  } else {
+    title = 'No live show';
+    if (b.newest_show_file) {
+      sub = `Newest show file: ${esc(b.newest_show_file.name)}, stamped ${clock(b.newest_show_file.saved)}`;
+    }
+  }
+
+  if (b.changes_since_save > 0) {
+    const n = b.changes_since_save;
+    flag = `<div class="flag warn"><span aria-hidden="true">▲</span>${n} bridge ${n === 1 ? 'change' : 'changes'} since the last save</div>`;
+  } else if (b.changes_since_save === 0) {
+    flag = `<div class="flag ok"><span aria-hidden="true">✓</span>No bridge changes since the last save</div>`;
+  }
+  if (b.snapshot_error) flag += `<div class="flag bad"><span aria-hidden="true">!</span>${esc(b.snapshot_error)}</div>`;
+  if (b.state === 'lost') {
+    flag += `<div class="flag warn"><span aria-hidden="true">▲</span>Last heartbeat ${clock(b.heartbeat)}, and no stop was logged. MA quit, or the poller died.</div>`;
+  } else if (b.state === 'stopped' && b.heartbeat) {
+    flag += `<div class="subline">Last heartbeat ${clock(b.heartbeat)}</div>`;
+  }
+
+  const facts = [];
+  const fact = (k, v) => { if (v !== undefined && v !== null && v !== '') facts.push(`<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`); };
+  if (snap) {
+    fact('Version', snap.version);
+    fact('User', snap.user === snap.profile ? snap.user : `${snap.user} / ${snap.profile}`);
+    fact('Sequence', snap.sequence && `${snap.sequence.no} ${snap.sequence.name}`);
+    fact('Page', snap.page && `${snap.page.no} ${snap.page.name}`);
+    fact('Selected', snap.selection != null ? `${num(snap.selection)} fixtures` : null);
+    fact('Patched', snap.fixtures != null ? `${num(snap.fixtures)} fixtures` : null);
+  }
+  fact('Last command', last ? clock(last.ts) : 'None yet');
+  if (b.pending.length) fact('In flight', `${b.pending.length} request${b.pending.length > 1 ? 's' : ''}`);
+  if (live) fact('Mode', b.confirm ? 'Confirm each request' : 'Runs without asking');
+
+  const tests = b.selftest.length ? `
+    <details class="selftest" data-key="${b.key}" ${openTests.has(b.key) ? 'open' : ''}>
+      <summary>Plugin self-test (${b.selftest.filter(l => l.includes('= ok')).length} of ${b.selftest.length} passed)</summary>
+      <ul>${b.selftest.map(l => `<li>${esc(l)}</li>`).join('')}</ul>
+    </details>` : '';
+
+  return `
+    <header>
+      <span class="name">${esc(b.label)} · <code>${esc(b.plugin)}</code></span>
+      <span class="pill ${b.state}"><span class="dot"></span>${STATE_TEXT[b.state]}<span data-snap="${b.key}"></span></span>
+    </header>
+    <div class="show">${title}</div>
+    <div class="subline">${sub}</div>
+    ${flag}
+    <dl class="facts">${facts.join('')}</dl>
+    ${tests}`;
+}
+
+function renderBridges() {
+  const box = $('bridges');
+  if (!box.children.length) {
+    box.innerHTML = state.bridges.map(b => `<article class="panel bridge" id="card-${b.key}"></article>`).join('');
+  }
+  // The live bridge gets the wider card, whichever one it is.
+  const first = state.bridges[0], second = state.bridges[1];
+  box.classList.toggle('swap', first.state !== 'live' && second?.state === 'live');
+  for (const b of state.bridges) {
+    const card = $(`card-${b.key}`), html = bridgeCard(b);
+    card.classList.toggle('off', b.state !== 'live');
+    if (cardHtml[b.key] !== html) { card.innerHTML = html; cardHtml[b.key] = html; }
+    const age = card.querySelector('[data-snap]');
+    if (age) age.textContent = b.state === 'live' && b.snapshot_at ? ` · read ${ago(state.now - b.snapshot_at)}` : '';
+  }
+}
+
+/* ---- filters */
+
+function bridgeRows() {
+  return view.bridge === 'all' ? commands : commands.filter(c => c.bridge === view.bridge);
+}
+
+function renderSegs() {
+  const rows = bridgeRows();
+  const options = [['all', 'All'], ...state.bridges.map(b => [b.key, b.label])];
+  $('bridgeFilter').innerHTML = options.map(([k, label]) =>
+    `<button data-v="${k}" aria-pressed="${view.bridge === k}">${esc(label)}</button>`).join('');
+  const counts = {
+    all: rows.length,
+    change: rows.filter(c => c.kind === 'change' && !failed(c)).length,
+    read: rows.filter(c => c.kind === 'read' && !failed(c)).length,
+    failed: rows.filter(failed).length,
+  };
+  const kinds = [['all', 'All'], ['change', 'Changes'], ['read', 'Reads'], ['failed', 'Failed']];
+  $('kindFilter').innerHTML = kinds.map(([k, label]) =>
+    `<button data-v="${k}" aria-pressed="${view.kind === k}">${label}<span class="n">${num(counts[k])}</span></button>`).join('');
+}
+
+/* ---- tiles and chart */
+
+function renderTiles() {
+  const rows = bridgeRows();
+  const changes = rows.filter(c => c.kind === 'change' && !failed(c)).length;
+  const bad = rows.filter(failed);
+  const times = rows.map(c => c.ms).filter(v => v != null).sort((a, b) => a - b);
+  const median = times.length ? times[Math.floor(times.length / 2)] : null;
+  const slowest = times.length ? times[times.length - 1] : null;
+  const started = rows.length ? rows[rows.length - 1].ts : null;
+  const tile = (label, value, sub) =>
+    `<div class="tile"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
+  $('tiles').innerHTML =
+    tile('Commands fired', num(rows.length), started ? `since ${clock(started)}` : 'None yet') +
+    tile('Changes', num(changes), rows.length ? `${Math.round(changes / rows.length * 100)}% of commands` : '&nbsp;') +
+    tile('Failed', num(bad.length), bad.length ? `last at ${clock(bad[0].ts)}` : 'None') +
+    tile('Median run time', median == null ? '–' : `${num(median)} ms`, slowest == null ? '&nbsp;' : `slowest ${num(slowest)} ms`);
+}
+
+function chartBuckets(rows) {
+  if (!rows.length) return null;
+  const lo = rows[rows.length - 1].ts, hi = rows[0].ts;
+  const size = [5, 10, 15, 30, 60, 120, 360, 720, 1440].map(m => m * 60).find(s => (hi - lo) / s <= 48) ?? 2880 * 60;
+  const offset = new Date(lo * 1000).getTimezoneOffset() * 60;
+  const align = t => Math.floor((t - offset) / size) * size + offset;
+  const start = align(lo), count = Math.floor((align(hi) - start) / size) + 1;
+  const buckets = Array.from({ length: count }, (_, i) => ({ from: start + i * size, to: start + (i + 1) * size, change: 0, read: 0, failed: 0 }));
+  for (const c of rows) {
+    const b = buckets[Math.floor((c.ts - start) / size)];
+    b[failed(c) ? 'failed' : c.kind]++;
+  }
+  return buckets;
+}
+
+function renderChart() {
+  const svg = $('chart'), rows = bridgeRows(), buckets = chartBuckets(rows);
+  const W = svg.clientWidth, H = 170, L = 30, R = 4, T = 6, B = 20;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  if (!buckets || !W) { svg.innerHTML = ''; return; }
+  const totals = buckets.map(b => b.change + b.read + b.failed);
+  const peak = Math.max(...totals);
+  const step = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000].find(s => peak / s <= 4) ?? Math.ceil(peak / 4);
+  const top = Math.ceil(peak / step) * step;
+  const y = v => T + (H - T - B) * (1 - v / top);
+  const slot = (W - L - R) / buckets.length;
+  const gap = Math.min(4, Math.max(2, slot * .2)), bar = slot - gap;
+  const parts = [];
+
+  for (let v = 0; v <= top; v += step) {
+    parts.push(`<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/>`);
+    parts.push(`<text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`);
+  }
+  const everyLabel = Math.max(1, Math.ceil(66 / slot));
+  buckets.forEach((b, i) => {
+    const x = L + i * slot + gap / 2;
+    let base = 0;
+    const stack = [['change', 'var(--series-change)'], ['read', 'var(--series-read)'], ['failed', 'var(--critical)']]
+      .filter(([k]) => b[k]);
+    stack.forEach(([k, colour], n) => {
+      const y1 = y(base + b[k]), y0 = y(base);
+      const h = Math.max(1, y0 - y1 - (n < stack.length - 1 ? 2 : 0));
+      const yTop = y0 - h - (n ? 0 : 0);
+      const r = n === stack.length - 1 ? Math.min(4, bar / 2, h) : 0;
+      parts.push(`<path fill="${colour}" d="M${x} ${y0}V${yTop + r}Q${x} ${yTop} ${x + r} ${yTop}H${x + bar - r}Q${x + bar} ${yTop} ${x + bar} ${yTop + r}V${y0}Z"/>`);
+      base += b[k];
+    });
+    if (i % everyLabel === 0) {
+      const d = new Date(b.from * 1000);
+      const span = buckets[buckets.length - 1].to - buckets[0].from;
+      const label = span > 172800 ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+        : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      parts.push(`<text x="${x + bar / 2}" y="${H - 5}" text-anchor="middle">${label}</text>`);
+    }
+    parts.push(`<rect class="hit" data-i="${i}" x="${L + i * slot}" y="${T}" width="${slot}" height="${H - T - B}"/>`);
+  });
+  svg.innerHTML = parts.join('');
+  svg._buckets = buckets;
+}
+
+$('chart').addEventListener('mousemove', e => {
+  const tip = $('tip'), i = e.target.dataset?.i;
+  if (i === undefined) { tip.hidden = true; return; }
+  const b = $('chart')._buckets[i];
+  const hm = t => new Date(t * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  tip.innerHTML = `<b>${hm(b.from)} to ${hm(b.to)}</b>${b.change} changes · ${b.read} reads · ${b.failed} failed`;
+  tip.hidden = false;
+  const box = $('chartWrap').getBoundingClientRect();
+  const left = e.clientX - box.left + 12;
+  tip.style.left = Math.min(left, box.width - tip.offsetWidth - 8) + 'px';
+  tip.style.top = (e.clientY - box.top - 44) + 'px';
+});
+$('chart').addEventListener('mouseleave', () => { $('tip').hidden = true; });
+new ResizeObserver(() => { if (state) renderChart(); }).observe($('chartWrap'));
+
+/* ---- commands table */
+
+function visibleRows() {
+  let rows = bridgeRows();
+  if (view.kind === 'failed') rows = rows.filter(failed);
+  else if (view.kind !== 'all') rows = rows.filter(c => c.kind === view.kind && !failed(c));
+  return rows;
+}
+
+function statusCell(c) {
+  if (c.status === 'ok') return `<span class="st">OK</span>`;
+  if (c.status === 'pending') return `<span class="st run">Running</span>`;
+  const text = { runtime_error: 'Error', syntax_error: 'Syntax error', rejected: 'Refused', stale: 'Stale' }[c.status] ?? c.status;
+  return `<span class="st bad"><span aria-hidden="true">✕ </span>${esc(text)}</span>`;
+}
+
+function renderCommands() {
+  const rows = visibleRows();
+  const panel = $('commandPanel');
+  if (!rows.length) {
+    panel.innerHTML = `<div class="empty">${commands.length ? 'Nothing matches these filters.' : 'No commands yet.'}</div>`;
+    return;
+  }
+  let group = null;
+  const body = rows.slice(0, view.shown).map(c => {
+    const fresh = !firstLoad && !seen.has(c.id) ? ' fresh' : '';
+    const here = `${c.bridge}/${c.show}`;
+    const divider = here === group ? '' : `<tr class="group"><td colspan="7">${
+      c.show ? esc(c.show) : '<span class="unknown">Show not recorded</span>'}<span class="on"> on ${esc(shortLabel(c.bridge))}</span></td></tr>`;
+    group = here;
+    return `${divider}<tr class="row${fresh}" tabindex="0" data-b="${c.bridge}" data-id="${esc(c.id)}">
+      <td class="t-time">${clock(c.ts)}</td>
+      <td class="t-bridge">${esc(shortLabel(c.bridge))}</td>
+      <td><span class="kind ${c.kind}"><i></i>${c.kind === 'change' ? 'Change' : 'Read'}</span></td>
+      <td class="t-ran"><span class="clamp">${esc(c.summary)}</span></td>
+      <td class="t-result"><span class="clamp">${esc(c.result)}</span></td>
+      <td>${statusCell(c)}</td>
+      <td class="t-num t-ms">${c.ms == null ? '' : `${num(c.ms)} ms`}</td>
+    </tr>`;
+  }).join('');
+  const left = rows.length - view.shown;
+  panel.innerHTML = `<table>
+    <thead><tr><th>Time</th><th class="t-bridge">Bridge</th><th>Type</th><th>What ran</th><th class="t-result">Result</th><th>Status</th><th class="t-num t-ms">Took</th></tr></thead>
+    <tbody>${body}</tbody></table>
+    ${left > 0 ? `<button class="more" id="more">Show ${Math.min(PAGE, left)} more of ${num(left)}</button>` : ''}`;
+  for (const c of commands) seen.add(c.id);
+  firstLoad = false;
+}
+
+function renderHistory() {
+  renderSegs();
+  renderTiles();
+  renderChart();
+  renderCommands();
+}
+
+async function loadCommands() {
+  commands = await getJson(`/api/commands?q=${encodeURIComponent(view.q)}`);
+  renderHistory();
+}
+
+/* ---- show data */
+
+function barList(title, rows, label) {
+  const sorted = rows.filter(r => r.count > 0).sort((a, b) => b.count - a.count);
+  const peak = Math.max(1, ...sorted.map(r => r.count));
+  return `<div class="panel barlist"><h3>${title}</h3>${sorted.map(r => `
+    <div class="bar-row" title="${esc(label(r))}: ${num(r.count)}">
+      <span class="nm">${esc(label(r))}</span>
+      <span class="track"><div class="fill" style="width:${r.count / peak * 100}%"></div></span>
+      <span class="val">${num(r.count)}</span>
+    </div>`).join('')}</div>`;
+}
+
+let poolKey = '';
+function renderPools() {
+  const wanted = view.bridge === 'all' ? null : view.bridge;
+  const candidates = state.bridges.filter(b => b.snapshot && (!wanted || b.key === wanted));
+  const b = candidates.find(x => x.state === 'live') ?? candidates[0];
+  const key = b ? JSON.stringify([b.key, b.snapshot.pools, b.snapshot.presets, b.state]) : wanted;
+  if (key === poolKey) return;
+  poolKey = key;
+  const box = $('poolData');
+  if (!b) {
+    box.style.gridTemplateColumns = '1fr';
+    box.innerHTML = `<div class="panel empty">Nothing read from this console yet. Pool counts appear once its plugin is running.</div>`;
+    return;
+  }
+  box.style.gridTemplateColumns = '';
+  const where = esc(b.snapshot.show ?? b.label);
+  box.innerHTML = barList(`Pools in ${where}`, b.snapshot.pools, r => r.name)
+    + barList('Preset pools', b.snapshot.presets, r => `${r.no} ${r.name}`);
+}
+
+/* ---- files */
+
+async function loadFiles() {
+  const files = await getJson('/api/files');
+  $('files').innerHTML = `<table>
+    <thead><tr><th>What</th><th class="t-num">Entries</th><th class="t-num f-size">Size</th><th class="t-num">Modified</th></tr></thead>
+    <tbody>${files.map(f => `
+      <tr ${f.readable ? `class="row" tabindex="0" data-file="${esc(f.name)}"` : ''}>
+        <td>${esc(f.label)}</td>
+        <td class="t-num">${f.rows == null ? '' : `${num(f.rows)} ${f.unit}`}</td>
+        <td class="t-num f-size">${bytes(f.size)}</td>
+        <td class="t-num">${clock(f.modified)}</td>
+      </tr>`).join('')}</tbody></table>`;
+}
+
+/* ---- drawer */
+
+async function openCommand(bridge, id) {
+  const c = await getJson(`/api/command?bridge=${bridge}&id=${encodeURIComponent(id)}`);
+  const r = c.response ?? {};
+  const returns = (r.returns ?? []).join('\n');
+  const fact = (k, v) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`;
+  $('dTitle').textContent = c.summary;
+  $('dBody').innerHTML = `
+    <dl class="facts">
+      ${fact('Time', clock(c.ts))}
+      ${fact('Bridge', shortLabel(c.bridge))}
+      ${fact('Show', c.show ?? 'Not recorded')}
+      ${fact('Tool', c.tool)}
+      ${fact('Took', c.ms == null ? '' : `${num(c.ms)} ms`)}
+      ${fact('Size', bytes(c.bytes))}
+    </dl>
+    ${failed(c) && c.kind === 'change' ? `<div class="d-warn">This snippet contains writes and failed, so part of it may have applied.</div>` : ''}
+    ${r.error ? `<h3>Error</h3><pre class="wrap">${esc(r.error)}</pre>` : ''}
+    ${c.cmds.length ? `<h3>MA commands in this snippet. %d and %s are filled in when it runs.</h3>${c.cmds.map(t => `<div class="tmpl">${esc(t)}</div>`).join('')}` : ''}
+    ${returns ? `<h3>Returned</h3><pre class="wrap">${esc(returns.slice(0, 20000))}${returns.length > 20000 ? '\n…cut at 20,000 characters' : ''}</pre>` : ''}
+    ${r.output ? `<h3>Printed</h3><pre class="wrap">${esc(r.output.slice(0, 20000))}</pre>` : ''}
+    <h3>Lua source · ${esc(c.id)}</h3>
+    <pre>${esc(c.source)}</pre>`;
+  $('drawer').showModal();
+}
+
+async function openFile(name) {
+  const f = await getJson(`/api/file?name=${encodeURIComponent(name)}`);
+  $('dTitle').textContent = f.name;
+  const cut = f.total > 300 ? `First 300 of ${num(f.total)} lines` : `${num(f.total)} lines`;
+  $('dBody').innerHTML = `<h3 style="margin-top:0">${cut}</h3><pre>${esc(f.text)}</pre>`;
+  $('drawer').showModal();
+}
+
+$('dClose').addEventListener('click', () => $('drawer').close());
+$('drawer').addEventListener('click', e => { if (e.target === $('drawer')) $('drawer').close(); });
+
+/* ---- events */
+
+function activate(row) {
+  if (row.dataset.file) openFile(row.dataset.file);
+  else if (row.dataset.id) openCommand(row.dataset.b, row.dataset.id);
+}
+document.addEventListener('click', e => {
+  const row = e.target.closest('tr.row');
+  if (row && !getSelection().toString()) activate(row);
+  if (e.target.id === 'more') { view.shown += PAGE; renderCommands(); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.matches?.('tr.row')) activate(e.target);
+});
+document.addEventListener('toggle', e => {
+  const key = e.target.dataset?.key;
+  if (!key) return;
+  e.target.open ? openTests.add(key) : openTests.delete(key);
+  cardHtml[key] = null;
+}, true);
+$('bridgeFilter').addEventListener('click', e => {
+  const v = e.target.closest('button')?.dataset.v;
+  if (!v) return;
+  view.bridge = v; view.shown = PAGE;
+  renderHistory(); renderPools();
+});
+$('kindFilter').addEventListener('click', e => {
+  const v = e.target.closest('button')?.dataset.v;
+  if (!v) return;
+  view.kind = v; view.shown = PAGE;
+  renderSegs(); renderCommands();
+});
+let searchTimer;
+$('search').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    view.q = e.target.value.trim(); view.shown = PAGE;
+    loadCommands();
+  }, 200);
+});
+
+/* ---- refresh */
+
+let tickCount = 0;
+async function tick() {
+  try {
+    state = await getJson('/api/state');
+    if (state.rev !== rev) {
+      rev = state.rev;
+      await loadCommands();
+    }
+    renderBridges();
+    renderPools();
+    if (tickCount++ % 15 === 0) await loadFiles();
+    $('banner').hidden = true;
+    const mode = state.console ? '' : ' · Files only, nothing sent to MA';
+    $('updated').textContent = `Updated ${clock(state.now)}${mode}`;
+  } catch (error) {
+    $('banner').hidden = false;
+    $('banner').textContent = 'The dashboard server is not answering, so everything here may be out of date.';
+    console.error(error);
+  }
+  setTimeout(tick, 2000);
+}
+tick();
+</script>
+</body>
+</html>

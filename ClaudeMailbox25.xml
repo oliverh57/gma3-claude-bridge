@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GMA3 DataVersion="2.5.1.1">
+    <UserPlugin Name="ClaudeMailbox25" Path="" Version="0.1.0.0">
+        <ComponentLua Name="Main" FileName="ClaudeMailbox25.lua" />
+    </UserPlugin>
+</GMA3>
