@@ -2,6 +2,8 @@
 # Show data, backups, journals, logs and mailbox traffic stay local.
 /*
 !/.gitignore
+!/README.md
+!/SETUP.md
 !/.mcp.json
 !/.claude/
 /.claude/*
